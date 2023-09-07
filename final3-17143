@@ -1,0 +1,125 @@
+import numpy as np
+import cv2 as cv2
+import matplotlib.pyplot as plt
+from matplotlib.widgets import Slider
+
+def analysisFilter(img):
+    dim = img.shape
+    xh_col = np.zeros([dim[0],dim[1]//2])
+    xg_col = np.zeros([dim[0],dim[1]//2])
+    xhh = np.zeros([dim[0]//2,dim[1]//2])
+    xhg = np.zeros([dim[0]//2,dim[1]//2])
+    xgh = np.zeros([dim[0]//2,dim[1]//2])
+    xgg = np.zeros([dim[0]//2,dim[1]//2])
+    d = np.sqrt(2)
+    for i in range(dim[1]//2):
+        xh_col[:,i] = (img[:,2*i]+img[:,2*i+1])/d
+        xg_col[:,i] = (img[:,2*i]-img[:,2*i+1])/d
+
+    for i in range(dim[1]//2):
+        xhh[i,:] = (xh_col[2*i,:]+xh_col[2*i+1,:])/d
+        xhg[i,:] = (xg_col[2*i,:]+xg_col[2*i+1,:])/d
+        xgh[i,:] = (xh_col[2*i,:]-xh_col[2*i+1,:])/d
+        xgg[i,:] = (xg_col[2*i,:]-xg_col[2*i+1,:])/d
+    return (xhh,xhg,xgh,xgg)
+
+def synthesisFilter(xhh,xhg,xgh,xgg):
+    dim = xhh.shape
+    xh_c = np.zeros([dim[0],dim[1]*2])
+    xg_c = np.zeros([dim[0],dim[1]*2])
+    x = np.zeros([2*dim[0],dim[1]*2])
+    d = np.sqrt(2)
+    xh_c[:,::2] = (xhh+xhg)/d
+    xh_c[:,1::2] = (xhh-xhg)/d
+    xg_c[:,::2] = (xgh+xgg)/d
+    xg_c[:,1::2] = (xgh-xgg)/d
+
+    x[::2,:] = (xh_c+xg_c)/d
+    x[1::2,:] = (xh_c-xg_c)/d
+
+    return x
+
+def haar3(imgn,img,nsig):
+    (xhh,xhg,xgh,xgg) = analysisFilter(imgn)
+    (xhh1,xhg1,xgh1,xgg1) = analysisFilter(xhh)
+    (xhh2,xhg2,xgh2,xgg2) = analysisFilter(xhh1)
+    subImg = [xhh2,xhg2,xgh2,xgg2,xhg1,xgh1,xgg1,xhg,xgh,xgg]
+#    output=np.zeros(dim)
+#    output[0:M//2,0:N//2]=xhh.copy()
+#    output[0:M//2,N//2:N]=xhg
+#    output[M//2:M,0:N//2]=xgh
+#    output[M//2:M,N//2:N]=xgg
+#    output[0:M//4,N//4:N//2]=xhg1
+#    output[M//4:M//2,0:N//4]=xgh1
+#    output[M//4:M//2,N//4:N//2]=xgg1
+#    output[0:M//8,0:N//8]=xhh2
+#    output[0:M//8,N//8:N//4]=xhg2
+#    output[M//8:M//4,0:N//8]=xgh2
+#    output[M//8:M//4,N//8:N//4]=xgg2
+    
+    subImg_den = [xhh2]
+    for i in range(1,len(subImg)):
+        dim_si = subImg[i].shape
+        t=20*np.sqrt(2*(nsig**2)*np.log2(dim_si[0]*dim_si[1])/(dim_si[0]*dim_si[1]))
+        #print(t)
+        xd = (subImg[i]-t)*(subImg[i]>t)+(subImg[i]+t)*(subImg[i]<-t)
+        xd = xd*(np.max(xd)+t)/(np.max(xd))
+        subImg_den.append(xd)
+
+    xhh1_den = synthesisFilter(subImg_den[0],subImg_den[1],subImg_den[2],subImg_den[3])
+    xhh2_den = synthesisFilter(xhh1_den,subImg_den[4],subImg_den[5],subImg_den[6])
+    xhh3_den = synthesisFilter(xhh2_den,subImg_den[7],subImg_den[8],subImg_den[9])
+
+    errImage_n = imgn-img
+    errImage = xhh3_den-img
+    psnr_n = 20*np.log10(255*dim[0]*dim[1]/np.linalg.norm(errImage_n))
+    psnr = 20*np.log10(255*dim[0]*dim[1]/np.linalg.norm(errImage))
+    pgain = psnr-psnr_n
+    #print(pgain)
+    return xhh3_den,pgain
+
+img = cv2.imread('Lenna.jpg',cv2.IMREAD_GRAYSCALE)
+dim = img.shape
+ps = range(10,31,5)
+nsigps = [10**(np.log10(255)-(p/20)) for p in ps]
+nsig=10**(np.log10(255)-(25/20))
+noise = np.random.randn(dim[0],dim[1])*nsig
+imgn = img + noise
+
+img_den,pgain = haar3(imgn,img,nsig)
+
+plt.figure()
+plt.subplot(131)
+plt.imshow(img,cmap='gray')
+plt.title('Noiseless Image')
+plt.subplot(132)
+plt.imshow(imgn,cmap='gray')
+plt.title('Noisy Image')
+plt.subplot(133)
+plt.imshow(img_den,cmap='gray')
+plt.title('Denoised Image')
+
+pg_ar = np.zeros(len(nsigps))
+for i in range(len(nsigps)):
+    nsig=nsigps[i]
+    noise = np.random.randn(dim[0],dim[1])*nsigps[i]
+    imgn = img + noise
+    img_den,pg_ar[i] = haar3(imgn,img,nsigps[i])
+print(pg_ar)
+
+
+
+plt.figure()
+plt.subplot(131)
+plt.imshow(img,cmap='gray')
+plt.title('Noiseless Image')
+plt.subplot(132)
+plt.imshow(imgn,cmap='gray')
+plt.title('Noisy Image')
+plt.subplot(133)
+plt.imshow(img_den,cmap='gray')
+plt.title('Denoised Image')
+plt.show()
+
+
+
