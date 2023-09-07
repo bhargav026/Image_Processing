@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Dec  2 11:14:18 2019
-
-@author: Madhu
-"""
 #import cv2 as cv
 #import numpy as np
 #
