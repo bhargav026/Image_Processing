@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Dec  4 21:26:45 2019
-
-@author: Madhu
-"""
-
 import os
 import numpy as np
 from PIL import Image
