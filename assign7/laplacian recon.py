@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Dec  3 10:01:07 2019
-
-@author: Madhu
-"""
-
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.widgets import Slider
